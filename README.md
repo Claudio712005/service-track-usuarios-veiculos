@@ -131,11 +131,72 @@ O compose sobe a pilha local:
 |---|---|---|
 | Grafana | http://localhost:3000 | visualização, `admin` / `admin` |
 | Loki | http://localhost:3100 | logs |
-| Prometheus | http://localhost:9090 | métricas de `/actuator/prometheus` |
+| Prometheus | http://localhost:9090 | métricas |
 | Alloy | http://localhost:12345 | coleta os logs do contêiner e envia ao Loki |
+| Exportador do Redis | http://localhost:9121 | métricas do cache (perfil `postgres`) |
+| Exportador do Postgres | http://localhost:9187 | métricas do banco (perfil `postgres`) |
+| Receptor de alerta | http://localhost:8082 | registra no log a notificação que o Grafana envia |
 
-O Grafana entra **limpo**, apenas com as fontes de dados provisionadas: painel e alerta são
-criados por quem opera.
+Tudo é provisionado por arquivo em `observabilidade/grafana/`. Subir o compose já entrega
+fontes de dados, painéis, alertas e playlists — não há passo manual na interface.
+
+### Painéis
+
+| Pasta | Painel | Para quê |
+|---|---|---|
+| `servico` | **visão geral** | saúde, taxa, erro, latência e cache numa tela; é a tela inicial |
+| `servico` | **requisições** | rota a rota, alvos de tempo de resposta, erros e uso do repositório |
+| `servico` | **JVM e processo** | memória, coleta de lixo, threads, CPU e disco |
+| `servico` | **logs e correlação** | volume por nível, origens e o rastro de uma correlação |
+| `servico` | **resiliência e cache** | limitador de taxa, cache Redis e prova de degradação |
+| `infra` | **Postgres e pool** | banco e o orçamento de conexões do Hikari |
+| `infra` | **Redis** | memória, chaves, taxa de acerto e comandos |
+| `plataforma` | **saúde da pilha** | alvos de coleta, Prometheus, Loki, Alloy e Grafana |
+
+O provedor sobe com `allowUiUpdates`, então dá para editar na interface. Para a mudança
+sobreviver a um `down -v`, exportar o JSON e sobrescrever o arquivo em
+`observabilidade/grafana/dashboards/`.
+
+### Playlists
+
+Playlist não tem provisionamento por arquivo no Grafana, então o serviço `grafana-playlists`
+aplica quatro por API, de forma idempotente, e encerra:
+
+| Playlist | Giro | Conteúdo |
+|---|---|---|
+| Rodízio operacional | 1 min | visão geral, requisições, JVM, Postgres |
+| Plantão de incidente | 30 s | visão geral, logs, resiliência |
+| Tudo do serviço | 2 min | todos os painéis com a etiqueta `usuarios-veiculos` |
+| Infraestrutura e pilha | 1 min | Postgres, Redis, saúde da pilha |
+
+Reaplicar depois de mexer nelas: `docker compose --profile postgres up grafana-playlists`.
+
+### Alertas
+
+Onze regras na pasta **Alertas do serviço**, avaliadas a cada minuto: serviço fora do ar, erro
+5xx acima de 5%, p95 acima de 1s, pool do banco com requisição em espera, heap acima de 85%,
+limitador barrando, erro no log, cache indisponível, Redis fora, Postgres fora e reinício do
+processo.
+
+A notificação vai para um receptor local que **imprime o alerta no próprio log**, que o Alloy
+coleta — dá para ver o alerta chegando dentro do Grafana. Rota de verdade (e-mail, Slack,
+plantão) é decisão de quando o serviço for para o cluster, não de ambiente local.
+
+As regras de Redis e Postgres ficam sem dado no perfil `h2`, onde esses serviços não existem.
+É de propósito: `noDataState` delas é `OK`, então não alertam por ausência.
+
+### O que ainda não é observado
+
+- **Não há trace distribuído.** Nem OpenTelemetry na aplicação, nem Tempo na pilha. É requisito
+  da Fase 4 e entra junto com a mensageria, porque só então há um salto entre serviços para
+  rastrear.
+- **Cache e limitador não publicam métrica própria.** O Micrometer não instrumenta `RedisCache`,
+  e o limitador é um `RateLimiter` avulso, fora de um registry. A taxa de acerto do cache vem do
+  exportador do Redis e o limitador é medido pelas respostas 429 — que é observação por efeito,
+  não por instrumentação. Fechar isso é mudança na aplicação: registrar o limitador num
+  `RateLimiterRegistry` e expor as estatísticas do cache.
+- **Sem métrica por contêiner.** O cadvisor foi testado e no colima só enxerga o cgroup raiz,
+  então saiu da pilha em vez de entregar painel vazio.
 
 ---
 
