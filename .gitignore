@@ -38,3 +38,11 @@ out/
 
 ### Kotlin ###
 .kotlin
+
+### Segredos locais ###
+.env
+.env.*
+keys/
+*.pem
+*.p12
+*.jks

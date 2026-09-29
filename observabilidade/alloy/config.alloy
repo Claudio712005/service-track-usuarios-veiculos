@@ -1,0 +1,69 @@
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+discovery.relabel "apenas_a_app" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    regex         = "app(-postgres)?"
+    action        = "keep"
+  }
+
+  rule {
+    target_label = "service_name"
+    replacement  = "service-track-usuarios-veiculos"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+}
+
+loki.source.docker "app" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.apenas_a_app.output
+  labels     = { ambiente = "local" }
+  forward_to = [loki.process.json_do_spring.receiver]
+}
+
+loki.process "json_do_spring" {
+  stage.json {
+    expressions = {
+      nivel         = "level",
+      logger        = "logger_name",
+      mensagem      = "message",
+      correlationId = "correlationId",
+      requestId     = "requestId",
+      momento       = "\"@timestamp\"",
+    }
+  }
+
+  stage.labels {
+    values = { nivel = "", logger = "" }
+  }
+
+  stage.structured_metadata {
+    values = { correlationId = "", requestId = "" }
+  }
+
+  stage.timestamp {
+    source = "momento"
+    format = "RFC3339Nano"
+  }
+
+  stage.output {
+    source = "mensagem"
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

@@ -1,0 +1,147 @@
+name: service-track-usuarios-veiculos
+
+x-app: &app
+  build:
+    context: ./software
+  image: servicetrack-usuarios-veiculos:local
+  container_name: st-usu-app
+  ports:
+    - "8080:8080"
+  environment:
+    ST_USU_FORMATO_DE_LOG: logstash
+  healthcheck:
+    test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/readiness | grep -q UP"]
+    interval: 10s
+    timeout: 5s
+    retries: 30
+    start_period: 30s
+
+services:
+
+  app:
+    <<: *app
+    profiles: [h2]
+    environment:
+      SPRING_PROFILES_ACTIVE: dev
+      ST_USU_FORMATO_DE_LOG: logstash
+
+  app-postgres:
+    <<: *app
+    profiles: [postgres]
+    networks:
+      default:
+        aliases: [app]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      ST_USU_DB_URL: jdbc:postgresql://postgres:5432/st_usu
+      ST_USU_DB_USER: st_usu_user
+      ST_USU_DB_PASSWORD: st_usu_local
+      ST_USU_REDIS_HOST: redis
+      ST_USU_FORMATO_DE_LOG: logstash
+
+  postgres:
+    image: postgres:16
+    container_name: st-usu-postgres
+    profiles: [postgres]
+    environment:
+      POSTGRES_DB: st_usu
+      POSTGRES_USER: st_usu_user
+      POSTGRES_PASSWORD: st_usu_local
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./db/postgres:/docker-entrypoint-initdb.d:ro
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U st_usu_user -d st_usu"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    container_name: st-usu-redis
+    profiles: [postgres]
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: st-usu-loki
+    profiles: [h2, postgres]
+    user: "0:0"
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./observabilidade/loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki:/loki
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+
+  alloy:
+    image: grafana/alloy:v1.5.1
+    container_name: st-usu-alloy
+    profiles: [h2, postgres]
+    command:
+      - run
+      - --server.http.listen-addr=0.0.0.0:12345
+      - /etc/alloy/config.alloy
+    depends_on:
+      loki:
+        condition: service_healthy
+    volumes:
+      - ./observabilidade/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "12345:12345"
+
+  prometheus:
+    image: prom/prometheus:v3.1.0
+    container_name: st-usu-prometheus
+    profiles: [h2, postgres]
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.retention.time=6h
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./observabilidade/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus:/prometheus
+
+  grafana:
+    image: grafana/grafana:11.5.2
+    container_name: st-usu-grafana
+    profiles: [h2, postgres]
+    depends_on:
+      loki:
+        condition: service_healthy
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_LOG_LEVEL: warn
+      GF_ANALYTICS_REPORTING_ENABLED: "false"
+      GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./observabilidade/grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana:/var/lib/grafana
+
+volumes:
+  postgres:
+  loki:
+  prometheus:
+  grafana:

@@ -1,0 +1,69 @@
+spring:
+  application:
+    name: service-track-usuarios-veiculos
+  threads:
+    virtual:
+      enabled: true
+  datasource:
+    url: ${ST_USU_DB_URL}
+    username: ${ST_USU_DB_USER}
+    password: ${ST_USU_DB_PASSWORD}
+    hikari:
+      pool-name: st-usu-pool
+      maximum-pool-size: ${ST_USU_DB_POOL_MAX:10}
+      minimum-idle: ${ST_USU_DB_POOL_MIN:2}
+      connection-timeout: 3000
+      validation-timeout: 2000
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: usuarios
+        jdbc:
+          time_zone: UTC
+  data:
+    redis:
+      repositories:
+        enabled: false
+      host: ${ST_USU_REDIS_HOST:redis}
+      port: ${ST_USU_REDIS_PORT:6379}
+      timeout: 2s
+      connect-timeout: 2s
+  cache:
+    type: redis
+
+servicetrack:
+  verificacao-de-credencial:
+    limite-por-janela: ${ST_USU_LIMITE_VERIFICACAO:20}
+    janela: 1s
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+      slo:
+        http.server.requests: 100ms,500ms,1s,3s
+
+logging:
+  structured:
+    format:
+      console: ${ST_USU_FORMATO_DE_LOG:logstash}
+  level:
+    root: INFO
+    com.clau.service_track.usuarios_veiculos: INFO
+    org.hibernate.SQL: WARN
