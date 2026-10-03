@@ -31,6 +31,6 @@ logging:
     format:
       console: ${ST_USU_FORMATO_DE_LOG:}
   pattern:
-    correlation: "[${spring.application.name:usuarios-veiculos},%X{correlationId:-},%X{requestId:-}] "
+    correlation: "[${spring.application.name:usuarios-veiculos},%X{traceId:-},%X{spanId:-},%X{correlationId:-},%X{requestId:-}] "
   level:
     com.clau.service_track.usuarios_veiculos: DEBUG
