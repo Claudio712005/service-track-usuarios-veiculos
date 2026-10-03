@@ -1,0 +1,32 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: service-track-usuarios-veiculos
+
+resources:
+  - ../../base
+
+components:
+  - ../../componentes/redis-efemero
+  - ../../componentes/nodeport
+
+images:
+  - name: servicetrack-usuarios-veiculos
+    newName: ecr-do-ambiente/servicetrack-hml-usuarios-veiculos
+    newTag: bootstrap
+
+patches:
+  - path: hpa-patch.yaml
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+configMapGenerator:
+  - name: service-track-usuarios-veiculos-config
+    literals:
+      - ST_USU_REDIS_HOST=service-track-usuarios-veiculos-redis
+      - ST_USU_REDIS_PORT=6379
+      - ST_USU_DB_POOL_MAX=10
+      - ST_USU_DB_POOL_MIN=2
+      - ST_USU_LIMITE_VERIFICACAO=20
+      - ST_USU_FORMATO_DE_LOG=logstash

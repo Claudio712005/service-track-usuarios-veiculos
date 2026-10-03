@@ -1,0 +1,205 @@
+name: CI
+
+run-name: "CI de ${{ github.ref_name }} por @${{ github.actor }}"
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DIRETORIO: software
+
+jobs:
+
+  segredos:
+    name: "1. Guarda de segredos"
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Nenhuma chave privada rastreada
+        run: |
+          if git ls-files | grep -qiE '\.(pem|key|p12|jks)$'; then
+            echo "::error::Arquivo de chave rastreado no repositorio."
+            git ls-files | grep -iE '\.(pem|key|p12|jks)$'
+            exit 1
+          fi
+
+      - name: Nenhum bloco de chave privada em arquivo versionado
+        run: |
+          if git grep -lE "BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY" -- . >/dev/null 2>&1; then
+            echo "::error::Bloco de chave privada encontrado em arquivo versionado."
+            git grep -lE "BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY" -- .
+            exit 1
+          fi
+
+      - name: Ferramental local nao vazou para o repositorio
+        run: |
+          if git ls-files | grep -qE '^(CLAUDE\.md|\.claude/|workspace/)'; then
+            echo "::error::Ferramental local rastreado no repositorio."
+            exit 1
+          fi
+
+  build:
+    name: "2. Build, testes e cobertura"
+    needs: segredos
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: ${{ env.DIRETORIO }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Compilar, testar e conferir a cobertura
+        run: ./gradlew --no-daemon build
+
+      - name: Publicar relatorio de testes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-de-teste
+          path: ${{ env.DIRETORIO }}/build/reports/tests/test
+          retention-days: 5
+
+      - name: Publicar relatorio de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura
+          path: ${{ env.DIRETORIO }}/build/reports/jacoco/test
+          retention-days: 5
+
+      - name: Resumo
+        if: always()
+        run: |
+          RELATORIO=build/reports/jacoco/test/jacocoTestReport.xml
+          {
+            echo "### Build e testes"
+            echo ""
+            echo "| Medida | Valor |"
+            echo "|---|---|"
+            python3 -c "import glob,xml.etree.ElementTree as ET; t=sum(int(ET.parse(p).getroot().get('tests')) for p in glob.glob('build/test-results/test/*.xml')); print('| Testes executados | %d |' % t)" || true
+            if [ -f "$RELATORIO" ]; then
+              python3 -c "import xml.etree.ElementTree as ET; r=ET.parse('$RELATORIO').getroot(); n={'LINE':'linha','INSTRUCTION':'instrucao','BRANCH':'ramo'}; [print('| Cobertura de %s | %.1f%% |' % (n[c.get('type')], int(c.get('covered'))*100/(int(c.get('covered'))+int(c.get('missed'))))) for c in r.findall('counter') if c.get('type') in n]"
+            fi
+            echo ""
+            echo "Portao: linha e instrucao em 80%, ramo em 60%. O build falha abaixo disso."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  imagem:
+    name: "3. Imagem de container"
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Construir a imagem sem publicar
+        uses: docker/build-push-action@v6
+        with:
+          context: software
+          push: false
+          load: true
+          tags: servicetrack-usuarios-veiculos:ci
+          provenance: false
+          sbom: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Conferir que a imagem sobe, atende e registra o log no padrao
+        run: |
+          docker run -d --name usu \
+            -e SPRING_PROFILES_ACTIVE=dev \
+            -p 8080:8080 \
+            servicetrack-usuarios-veiculos:ci
+
+          pronto=0
+          for _ in $(seq 1 60); do
+            if curl -sf http://localhost:8080/actuator/health | grep -q '"status":"UP"'; then
+              pronto=1
+              break
+            fi
+            sleep 2
+          done
+
+          if [ "$pronto" -ne 1 ]; then
+            echo "::error::A aplicacao nao ficou pronta em 120 segundos."
+            docker logs usu | tail -40
+            docker rm -f usu >/dev/null
+            exit 1
+          fi
+
+          echo "--- cadastro e consulta"
+          CRIADO=$(curl -s -o /tmp/criado.json -w '%{http_code}' -X POST http://localhost:8080/usuarios \
+            -H 'Content-Type: application/json' \
+            -H 'X-Correlation-Id: ci-fumaca' \
+            -d '{"documento":"52998224725","nome":"Joana da Silva","email":"joana@oficina.com.br","senha":"troque-esta-senha-no-ci","tipoDeUsuario":"MECANICO"}')
+          if [ "$CRIADO" != "201" ]; then
+            echo "::error::POST /usuarios respondeu $CRIADO, esperado 201."
+            cat /tmp/criado.json
+            docker logs usu | tail -40
+            docker rm -f usu >/dev/null
+            exit 1
+          fi
+
+          echo "--- cabecalhos de correlacao na resposta"
+          CABECALHOS=$(curl -s -D - -o /dev/null -H 'X-Correlation-Id: ci-fumaca' http://localhost:8080/usuarios)
+          for cabecalho in "X-Correlation-Id" "X-Request-Id"; do
+            if ! grep -qi "^$cabecalho:" <<<"$CABECALHOS"; then
+              echo "::error::Resposta sem o cabecalho $cabecalho."
+              docker rm -f usu >/dev/null
+              exit 1
+            fi
+          done
+
+          echo "--- rastro na linha de acesso"
+          LINHA=$(docker logs usu 2>&1 | grep "requisicao concluida" | tail -1)
+          echo "$LINHA"
+          if ! grep -qE "\[service-track-usuarios-veiculos,[0-9a-f]{32},[0-9a-f]{16},ci-fumaca," <<<"$LINHA"; then
+            echo "::error::A linha de acesso saiu sem traceId, spanId ou correlacao no padrao de GLOBAL-ADR-006."
+            docker logs usu | tail -20
+            docker rm -f usu >/dev/null
+            exit 1
+          fi
+
+          echo "--- rota em template, nao caminho cru"
+          if docker logs usu 2>&1 | grep "requisicao concluida" | grep -qE "rota=/usuarios/[0-9a-f-]{36}"; then
+            echo "::error::O log registrou caminho com identificador em vez do template da rota."
+            docker rm -f usu >/dev/null
+            exit 1
+          fi
+
+          docker rm -f usu >/dev/null
+          echo "imagem sobe, atende e registra log no padrao"
+
+      - name: Tamanho da imagem
+        if: success()
+        run: |
+          TAMANHO=$(docker image inspect servicetrack-usuarios-veiculos:ci --format '{{.Size}}')
+          {
+            echo "### Imagem"
+            echo ""
+            echo "| Medida | Valor |"
+            echo "|---|---|"
+            echo "| Tamanho | $((TAMANHO / 1024 / 1024)) MB |"
+          } >> "$GITHUB_STEP_SUMMARY"

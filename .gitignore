@@ -39,6 +39,13 @@ out/
 ### Kotlin ###
 .kotlin
 
+### Terraform ###
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfplan
+
 ### Segredos locais ###
 .env
 .env.*
