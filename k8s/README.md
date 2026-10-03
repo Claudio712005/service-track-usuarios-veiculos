@@ -7,10 +7,11 @@ Manifestos Kubernetes deste microsserviço. GitOps: o ArgoCD sincroniza a partir
 k8s/
 ├── base/                      Namespace, Deployment, Service ClusterIP, HPA
 ├── componentes/
-│   └── redis-efemero/         Redis de dado descartável, usado em hml e prd
+│   ├── redis-efemero/         Redis de dado descartável, usado em hml e prd
+│   └── nodeport/              Service NodePort 30081, por onde o NLB interno entra
 ├── overlays/
-│   ├── hml/                   ECR de hml, HPA 1..2
-│   └── prd/                   ECR de prd, HPA 2..4
+│   ├── hml/                   ECR de hml, HPA 1..2, NodePort
+│   └── prd/                   ECR de prd, HPA 2..4, NodePort
 └── argocd/
     ├── hml.yaml               marcador de descoberta
     └── prd.yaml               marcador de descoberta
@@ -31,6 +32,19 @@ usadas: comportamento de cache, não de banco.
 
 Não há overlay para `kind`. O ambiente local é o `docker-compose.yml` da raiz, com os perfis `h2` e
 `postgres`.
+
+## Como se chega neste serviço
+
+| De onde | Por onde |
+|---|---|
+| Outro pod no cluster | `http://service-track-usuarios-veiculos.service-track-usuarios-veiculos.svc.cluster.local` |
+| BFF, por fora do cluster | API Gateway privada da plataforma → VPC Link → NLB interno → **NodePort 30081** |
+| Internet | **de nenhuma forma**, e isso é desenho, não pendência |
+
+A porta 30081 é contrato com `service-track-aws-iac`
+(`apis/service-track-api-int/servicos-<ENV>.yaml`, `IAC-ADR-033`) e **nada valida o par**:
+mudar aqui sem mudar lá dá alvo `unhealthy` no NLB e `503` na rota, sem erro de apply.
+Detalhe em [componentes/nodeport/README.md](componentes/nodeport/README.md).
 
 ## Credencial do banco não vem do ConfigMap
 
