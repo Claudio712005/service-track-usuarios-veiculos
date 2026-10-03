@@ -74,6 +74,30 @@ services:
       timeout: 3s
       retries: 20
 
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.67.0
+    container_name: st-usu-redis-exporter
+    profiles: [postgres]
+    depends_on:
+      redis:
+        condition: service_healthy
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    ports:
+      - "9121:9121"
+
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.16.0
+    container_name: st-usu-postgres-exporter
+    profiles: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_NAME: postgresql://st_usu_user:st_usu_local@postgres:5432/st_usu?sslmode=disable
+    ports:
+      - "9187:9187"
+
   loki:
     image: grafana/loki:3.3.2
     container_name: st-usu-loki
@@ -121,6 +145,17 @@ services:
       - ./observabilidade/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus:/prometheus
 
+  alerta-webhook:
+    image: mendhak/http-https-echo:36
+    container_name: st-usu-alerta-webhook
+    profiles: [h2, postgres]
+    environment:
+      HTTP_PORT: "8080"
+      LOG_WITHOUT_NEWLINE: "true"
+      DISABLE_REQUEST_LOGS: "false"
+    ports:
+      - "8082:8080"
+
   grafana:
     image: grafana/grafana:11.5.2
     container_name: st-usu-grafana
@@ -134,11 +169,31 @@ services:
       GF_LOG_LEVEL: warn
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
+      GF_DASHBOARDS_MIN_REFRESH_INTERVAL: 5s
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /etc/grafana/dashboards/servico/visao-geral.json
+      GF_UNIFIED_ALERTING_ENABLED: "true"
     ports:
       - "3000:3000"
     volumes:
       - ./observabilidade/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observabilidade/grafana/dashboards:/etc/grafana/dashboards:ro
       - grafana:/var/lib/grafana
+
+  grafana-playlists:
+    image: python:3.13-alpine
+    container_name: st-usu-grafana-playlists
+    profiles: [h2, postgres]
+    depends_on:
+      grafana:
+        condition: service_started
+    environment:
+      GRAFANA_URL: http://grafana:3000
+      GRAFANA_USER: admin
+      GRAFANA_PASSWORD: admin
+    volumes:
+      - ./observabilidade/grafana/playlists:/playlists:ro
+    command: ["python", "/playlists/aplica-playlists.py"]
+    restart: "no"
 
 volumes:
   postgres:

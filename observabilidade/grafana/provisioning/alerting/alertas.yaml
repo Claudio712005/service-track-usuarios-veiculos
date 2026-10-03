@@ -1,0 +1,582 @@
+apiVersion: 1
+
+groups:
+
+  - orgId: 1
+    name: usuarios-veiculos
+    folder: "Alertas do serviço"
+    interval: 1m
+    rules:
+      - uid: usu-fora-do-ar
+        title: "Serviço fora do ar"
+        condition: C
+        for: 1m
+        noDataState: Alerting
+        execErrState: Error
+        labels:
+          severidade: critico
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "O serviço não responde à coleta do Prometheus."
+          description: "O alvo usuarios-veiculos parou de responder. Conferir o contêiner e o endpoint /actuator/health."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'up{job="usuarios-veiculos"}'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 1
+              refId: C
+      - uid: usu-erro-5xx
+        title: "Erro 5xx acima de 5%"
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: critico
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "Mais de 5% das respostas são erro do servidor."
+          description: "Ver o painel de requisições por rota e as linhas de log em nível ERROR da mesma janela."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: '(sum(rate(http_server_requests_seconds_count{job="usuarios-veiculos", status=~"5.."}[5m])) or vector(0)) / clamp_min(sum(rate(http_server_requests_seconds_count{job="usuarios-veiculos"}[5m])), 0.0001)'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0.05
+              refId: C
+      - uid: usu-latencia-p95
+        title: "Latência p95 acima de 1s"
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alto
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "O percentil 95 do tempo de resposta passou de 1 segundo."
+          description: "Conferir tempo de obtenção de conexão no pool e latência do Redis antes de culpar a aplicação."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{job="usuarios-veiculos", uri!~"/actuator.*"}[5m])))'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 1
+              refId: C
+      - uid: usu-pool-em-espera
+        title: "Pool do banco com requisição em espera"
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alto
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "Há requisição parada na fila do pool de conexões."
+          description: "O teto do pool é orçamento declarado no service-track-db-infra. Aumentar réplica sem revisar o orçamento piora o problema."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'max(hikaricp_connections_pending{job="usuarios-veiculos"})'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: max
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+              refId: C
+      - uid: usu-heap-alto
+        title: "Heap acima de 85%"
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alto
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "A memória de heap passou de 85% do teto."
+          description: "Ver tempo em coleta de lixo no painel de JVM: heap alto com pausa crescente antecede OutOfMemoryError."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'sum(jvm_memory_used_bytes{job="usuarios-veiculos", area="heap"}) / clamp_min(sum(jvm_memory_max_bytes{job="usuarios-veiculos", area="heap"}), 1)'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0.85
+              refId: C
+      - uid: usu-limitador-barrando
+        title: "Limitador de taxa barrando requisição"
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: medio
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "A verificação de credencial está devolvendo 429."
+          description: "Pode ser carga legítima ou tentativa de força bruta. Conferir a origem pelo correlationId no painel de logs."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'sum(rate(http_server_requests_seconds_count{job="usuarios-veiculos", status="429"}[5m])) or vector(0)'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+              refId: C
+      - uid: usu-erros-no-log
+        title: "Erros no log"
+        condition: C
+        for: 5m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alto
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "O serviço está registrando erro de forma contínua."
+          description: "Erro no log sem 5xx correspondente costuma ser falha assíncrona, que nenhum código HTTP denuncia."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'sum(rate(logback_events_total{job="usuarios-veiculos", level="error"}[5m])) or vector(0)'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0.05
+              refId: C
+      - uid: usu-cache-indisponivel
+        title: "Cache indisponível"
+        condition: C
+        for: 1m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: medio
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "O serviço está operando sem cache."
+          description: "A requisição não cai, mas cada consulta por documento passa a ir ao banco. Conferir o Redis."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: loki
+            model:
+              datasource:
+                type: loki
+                uid: loki
+              expr: 'sum(count_over_time({service_name="service-track-usuarios-veiculos"} |= "cache indisponivel" [5m])) or vector(0)'
+              instant: false
+              range: true
+              refId: A
+              queryType: range
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+              refId: C
+      - uid: usu-redis-fora
+        title: "Redis fora do ar"
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: alto
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "O Redis não responde ao exportador."
+          description: "No perfil h2 não existe Redis e este alerta fica sem dado de propósito."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'redis_up'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 1
+              refId: C
+      - uid: usu-postgres-fora
+        title: "Postgres fora do ar"
+        condition: C
+        for: 2m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: critico
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "O Postgres não responde ao exportador."
+          description: "No perfil h2 não existe Postgres e este alerta fica sem dado de propósito."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'pg_up'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: last
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: lt
+                    params:
+                      - 1
+              refId: C
+      - uid: usu-reinicio
+        title: "Serviço reiniciou"
+        condition: C
+        for: 0m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severidade: baixo
+          servico: service-track-usuarios-veiculos
+        annotations:
+          summary: "O processo subiu de novo nos últimos dez minutos."
+          description: "Reinício fora de janela de deploy merece explicação: ver as últimas linhas antes do corte no painel de logs."
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              datasource:
+                type: prometheus
+                uid: prometheus
+              expr: 'changes(process_start_time_seconds{job="usuarios-veiculos"}[10m])'
+              instant: false
+              range: true
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: reduce
+              expression: A
+              reducer: max
+              settings:
+                mode: dropNN
+              refId: B
+          - refId: C
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator:
+                    type: gt
+                    params:
+                      - 0
+              refId: C
