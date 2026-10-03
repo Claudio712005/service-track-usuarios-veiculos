@@ -122,8 +122,31 @@ placa e chassi existem também no banco, não só na aplicação.
 
 ## Observabilidade
 
-Log em JSON no console, com `correlationId` e `requestId` no MDC. A correlação vem do cabeçalho
-`X-Correlation-Id` quando existe, é gerada quando não existe, e volta na resposta.
+### Padrão de log
+
+Quatro identificadores em toda linha, conforme `GLOBAL-ADR-006` e `USU-ADR-001`:
+
+| Campo | De onde vem | O que identifica |
+|---|---|---|
+| `traceId` / `spanId` | instrumentação, propagado por `traceparent` | o salto técnico entre processos |
+| `correlationId` | cabeçalho `X-Correlation-Id`, ou gerado | a operação de negócio inteira |
+| `requestId` | sempre gerado pelo serviço | esta requisição |
+
+`requestId` nunca é aceito de fora: valor repetido confundiria duas requisições no log, e o campo
+existe para distingui-las. Correlação é o contrário — repetir é o objetivo.
+
+A resposta devolve `X-Correlation-Id` e `X-Request-Id`, então quem chamou acha a própria requisição
+no log sem adivinhar.
+
+Uma linha por requisição, no fim dela, com a **rota em template** (`/usuarios/{id}`), nunca o caminho
+com identificador. Nível pelo resultado: ERROR em 5xx, WARN em 4xx, INFO em escrita, DEBUG em
+leitura. `actuator`, `swagger` e `api-docs` ficam fora.
+
+Em `dev` o padrão é `[serviço, traceId, spanId, correlationId, requestId]`; em hml e prd o formato é
+JSON e os campos vão como propriedades.
+
+**Documento nunca aparece inteiro no log nem em mensagem de erro**: `Mascara.documento` deixa só os
+quatro últimos caracteres (`***4725`). Senha, hash e token não são registrados em nenhuma hipótese.
 
 O compose sobe a pilha local:
 
