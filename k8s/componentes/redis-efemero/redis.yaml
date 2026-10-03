@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: service-track-usuarios-veiculos-redis
+  labels:
+    app: service-track-usuarios-veiculos-redis
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  replicas: 1
+  revisionHistoryLimit: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: service-track-usuarios-veiculos-redis
+  template:
+    metadata:
+      labels:
+        app: service-track-usuarios-veiculos-redis
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          args: ["--save", "", "--appendonly", "no", "--maxmemory", "64mb", "--maxmemory-policy", "allkeys-lru"]
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: service-track-usuarios-veiculos-redis
+  labels:
+    app: service-track-usuarios-veiculos-redis
+spec:
+  type: ClusterIP
+  selector:
+    app: service-track-usuarios-veiculos-redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
