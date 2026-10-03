@@ -139,6 +139,43 @@ criados por quem opera.
 
 ---
 
+## Testes e cobertura
+
+```bash
+cd software && ./gradlew build
+```
+
+`build` roda os testes **e o portão de cobertura**: abaixo do mínimo, o build falha. Medição de
+03/10/2026, sem exclusão de pacote nenhuma:
+
+| Medida | Atual | Mínimo exigido pelo portão |
+|---|---|---|
+| Linha | **90,9%** | 80% |
+| Instrução | **84,8%** | 80% |
+| Ramo | 65,4% | 60% |
+| Método | 89,3% | — |
+
+O portão de ramo está em 60% de propósito: é onde o código está hoje, e subir para 80% exige teste de
+caminho de erro que ainda não existe. O número publicado aqui é o real, não o conveniente — e o
+portão existe para impedir regressão, não para fingir que já chegamos.
+
+Onde a cobertura é mais baixa: `config` (47,9%, definição de bean), `excecao` (68,1%, caminhos de erro
+menos exercitados) e `filtro` (75,6%).
+
+## Como este serviço chega em hml e prd
+
+```
+1. rede e EKS            (service-track-aws-iac)
+2. esteira Infra         (deste repo: ECR + RDS + SSM, e ela chama a esteira Banco)
+3. esteira Banco         (Secret do banco a partir do SSM, baseline do schema, restart)
+4. esteira CD            (imagem no ECR + PR com a nova tag)
+5. merge do PR           (ArgoCD sincroniza o overlay do ambiente)
+```
+
+Detalhe de cada passo e das dependências em [k8s/README.md](k8s/README.md). A infraestrutura AWS do
+serviço vive em [infra/terraform/](infra/terraform/) e a decisão por trás dela em
+[`USU-ADR-002`](docs/adr/USU-ADR-002-infraestrutura-propria-do-servico.md).
+
 ## Resiliência
 
 - **Queda do Redis não derruba requisição.** A falha de cache é registrada em WARN e a consulta
