@@ -37,7 +37,9 @@ object Documento {
     fun exigirValido(bruto: String?): String {
         val documento = normalizar(bruto)
         if (!valido(documento)) {
-            throw DocumentoInvalidoException("Documento '$bruto' não é um CPF nem um CNPJ válido")
+            throw DocumentoInvalidoException(
+                "Documento ${Mascara.documento(bruto)} não é um CPF nem um CNPJ válido"
+            )
         }
         return documento
     }

@@ -1,6 +1,7 @@
 package com.clau.service_track.usuarios_veiculos.excecao
 
 import com.clau.service_track.usuarios_veiculos.dominio.ChassiInvalidoException
+import com.clau.service_track.usuarios_veiculos.filtro.FiltroDeCorrelacao
 import com.clau.service_track.usuarios_veiculos.dominio.DocumentoInvalidoException
 import com.clau.service_track.usuarios_veiculos.dominio.PlacaInvalidaException
 import io.github.resilience4j.ratelimiter.RequestNotPermitted
@@ -110,7 +111,7 @@ class TratadorGlobalDeErros {
 
     @ExceptionHandler(RequestNotPermitted::class)
     fun excessoDeTentativas(e: RequestNotPermitted, requisicao: HttpServletRequest): ResponseEntity<ErroResponse> {
-        log.warn("limite de verificação de credencial atingido caminho={}", requisicao.requestURI)
+        log.warn("limite de verificação de credencial atingido rota={}", FiltroDeCorrelacao.rotaDe(requisicao))
         return montarResposta(
             HttpStatus.TOO_MANY_REQUESTS,
             "EXCESSO_DE_TENTATIVAS",
@@ -129,7 +130,7 @@ class TratadorGlobalDeErros {
 
     @ExceptionHandler(Exception::class)
     fun naoPrevisto(e: Exception, requisicao: HttpServletRequest): ResponseEntity<ErroResponse> {
-        log.error("falha não prevista em {}", requisicao.requestURI, e)
+        log.error("falha não prevista rota={}", FiltroDeCorrelacao.rotaDe(requisicao), e)
         return montarResposta(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "ERRO_INTERNO",
