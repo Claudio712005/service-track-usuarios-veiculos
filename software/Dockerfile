@@ -41,8 +41,8 @@ COPY --from=extracao --chown=servicetrack:servicetrack /extracao/extraido/applic
 USER servicetrack
 
 ENV JDK_JAVA_OPTIONS="\
--XX:MaxRAMPercentage=75 \
--XX:InitialRAMPercentage=50 \
+-XX:MaxRAMPercentage=60 \
+-XX:InitialRAMPercentage=25 \
 -XX:+UseSerialGC \
 -XX:+ExitOnOutOfMemoryError \
 -Dfile.encoding=UTF-8"
