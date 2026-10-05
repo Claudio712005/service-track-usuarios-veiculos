@@ -14,9 +14,9 @@ import org.springframework.web.servlet.HandlerMapping
 
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
-class FiltroDeCorrelacao : OncePerRequestFilter() {
+class CorrelacaoFilter : OncePerRequestFilter() {
 
-    private val log = LoggerFactory.getLogger(FiltroDeCorrelacao::class.java)
+    private val log = LoggerFactory.getLogger(CorrelacaoFilter::class.java)
 
     override fun doFilterInternal(
         requisicao: HttpServletRequest,

@@ -234,9 +234,9 @@ cd software && ./gradlew build
 
 | Medida | Atual | Mínimo exigido pelo portão |
 |---|---|---|
-| Linha | **90,9%** | 80% |
-| Instrução | **84,8%** | 80% |
-| Ramo | 65,4% | 60% |
+| Linha | **91,3%** | 80% |
+| Instrução | **85,8%** | 80% |
+| Ramo | 70,5% | 60% |
 | Método | 89,3% | — |
 
 O portão de ramo está em 60% de propósito: é onde o código está hoje, e subir para 80% exige teste de
@@ -267,6 +267,29 @@ serviço vive em [infra/terraform/](infra/terraform/) e a decisão por trás del
 - **Verificação de credencial tem limitador de taxa** e devolve 429 no estouro.
 - **Documento inexistente compara contra um hash fixo**, para que o tempo de resposta não
   revele se o documento existe.
+
+---
+
+## Convenção de nomes
+
+**Domínio e aplicação em português. Ponto de encaixe com o framework fica na linguagem do
+framework.** O radical nomeia o assunto, o sufixo nomeia o papel técnico.
+
+| Papel | Sufixo | Exemplo |
+|---|---|---|
+| `@Configuration` | `Config` | `SenhaConfig`, `CacheConfig`, `OpenApiConfig` |
+| `@ConfigurationProperties` | `Properties` | `VerificacaoDeCredencialProperties` |
+| Filtro de servlet | `Filter` | `CorrelacaoFilter` |
+| `@RestControllerAdvice` | `ExceptionHandler` | `GlobalExceptionHandler` |
+| Exceção de domínio | `Exception` | `DocumentoInvalidoException` |
+| Mapeador | `Mapper` | `UsuarioMapper` |
+
+**Método `@Bean` se chama como o tipo que devolve**, em camelCase: `passwordEncoder`,
+`openApi`, `rateLimiter`, `redisCacheConfiguration`. Exceção: quando há mais de um bean do
+mesmo tipo, o nome descreve o papel, porque nomes de bean precisam ser distintos.
+
+O que **não** muda de língua: domínio, casos de uso, regras, mensagens de erro e nomes de
+método que não encostam no framework.
 
 ---
 

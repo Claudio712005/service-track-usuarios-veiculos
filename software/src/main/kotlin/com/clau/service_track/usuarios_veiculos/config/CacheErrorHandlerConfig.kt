@@ -9,9 +9,9 @@ import org.springframework.context.annotation.Configuration
 
 @Configuration
 @ConditionalOnProperty(name = ["spring.cache.type"], havingValue = "redis")
-class ConfiguracaoDeCacheTolerante : CachingConfigurer {
+class CacheErrorHandlerConfig : CachingConfigurer {
 
-    private val log = LoggerFactory.getLogger(ConfiguracaoDeCacheTolerante::class.java)
+    private val log = LoggerFactory.getLogger(CacheErrorHandlerConfig::class.java)
 
     override fun errorHandler(): CacheErrorHandler = object : CacheErrorHandler {
 

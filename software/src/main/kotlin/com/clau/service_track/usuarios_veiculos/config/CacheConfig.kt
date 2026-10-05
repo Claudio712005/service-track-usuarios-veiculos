@@ -12,10 +12,10 @@ import tools.jackson.databind.ObjectMapper
 
 @Configuration
 @ConditionalOnProperty(name = ["spring.cache.type"], havingValue = "redis")
-class ConfiguracaoDeCache {
+class CacheConfig {
 
     @Bean
-    fun configuracaoDoCache(mapper: ObjectMapper): RedisCacheConfiguration = RedisCacheConfiguration
+    fun redisCacheConfiguration(mapper: ObjectMapper): RedisCacheConfiguration = RedisCacheConfiguration
         .defaultCacheConfig()
         .entryTtl(Duration.ofMinutes(10))
         .disableCachingNullValues()

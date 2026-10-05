@@ -6,10 +6,10 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-class ConfiguracaoDoOpenApi {
+class OpenApiConfig {
 
     @Bean
-    fun definicaoDaApi(): OpenAPI = OpenAPI().info(
+    fun openApi(): OpenAPI = OpenAPI().info(
         Info()
             .title("ServiceTrack — usuários e veículos")
             .version("v1")
