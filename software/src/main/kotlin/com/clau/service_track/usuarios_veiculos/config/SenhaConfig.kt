@@ -6,8 +6,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder
 import org.springframework.security.crypto.password.PasswordEncoder
 
 @Configuration
-class ConfiguracaoDeSenha {
+class SenhaConfig {
 
     @Bean
-    fun codificadorDeSenha(): PasswordEncoder = BCryptPasswordEncoder(10)
+    fun passwordEncoder(): PasswordEncoder = BCryptPasswordEncoder(10)
 }

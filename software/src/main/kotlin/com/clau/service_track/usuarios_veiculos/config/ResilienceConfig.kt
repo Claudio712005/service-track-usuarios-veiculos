@@ -8,11 +8,11 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 
 @Configuration
-@EnableConfigurationProperties(PropriedadesDeVerificacaoDeCredencial::class)
-class ConfiguracaoDeResiliencia {
+@EnableConfigurationProperties(VerificacaoDeCredencialProperties::class)
+class ResilienceConfig {
 
     @Bean
-    fun limitadorDaVerificacaoDeCredencial(propriedades: PropriedadesDeVerificacaoDeCredencial): RateLimiter = RateLimiter.of(
+    fun rateLimiter(propriedades: VerificacaoDeCredencialProperties): RateLimiter = RateLimiter.of(
         "verificacaoDeCredencial",
         RateLimiterConfig.custom()
             .limitForPeriod(propriedades.limitePorJanela)

@@ -14,7 +14,7 @@ import kotlin.test.assertTrue
 
 @SpringBootTest
 @AutoConfigureMockMvc
-class FiltroDeCorrelacaoTest {
+class CorrelacaoFilterTest {
 
     @Autowired
     private lateinit var mockMvc: MockMvc
@@ -22,12 +22,12 @@ class FiltroDeCorrelacaoTest {
     @Test
     fun `devolve a correlacao informada e um identificador de requisicao proprio`() {
         val resposta = mockMvc.get("/usuarios") {
-            header(FiltroDeCorrelacao.CABECALHO_CORRELACAO, "jornada-de-teste")
+            header(CorrelacaoFilter.CABECALHO_CORRELACAO, "jornada-de-teste")
         }.andReturn().response
 
         assertAll(
-            { assertEquals("jornada-de-teste", resposta.getHeader(FiltroDeCorrelacao.CABECALHO_CORRELACAO)) },
-            { assertNotNull(resposta.getHeader(FiltroDeCorrelacao.CABECALHO_REQUISICAO)) },
+            { assertEquals("jornada-de-teste", resposta.getHeader(CorrelacaoFilter.CABECALHO_CORRELACAO)) },
+            { assertNotNull(resposta.getHeader(CorrelacaoFilter.CABECALHO_REQUISICAO)) },
         )
     }
 
@@ -35,15 +35,15 @@ class FiltroDeCorrelacaoTest {
     fun `gera correlacao quando o cabecalho nao vem`() {
         val resposta = mockMvc.get("/usuarios").andReturn().response
 
-        assertNotNull(resposta.getHeader(FiltroDeCorrelacao.CABECALHO_CORRELACAO))
+        assertNotNull(resposta.getHeader(CorrelacaoFilter.CABECALHO_CORRELACAO))
     }
 
     @Test
     fun `cada requisicao recebe um identificador diferente`() {
         val primeira = mockMvc.get("/usuarios").andReturn().response
-            .getHeader(FiltroDeCorrelacao.CABECALHO_REQUISICAO)
+            .getHeader(CorrelacaoFilter.CABECALHO_REQUISICAO)
         val segunda = mockMvc.get("/usuarios").andReturn().response
-            .getHeader(FiltroDeCorrelacao.CABECALHO_REQUISICAO)
+            .getHeader(CorrelacaoFilter.CABECALHO_REQUISICAO)
 
         assertNotEquals(primeira, segunda)
     }
@@ -51,10 +51,10 @@ class FiltroDeCorrelacaoTest {
     @Test
     fun `descarta caractere perigoso da correlacao recebida`() {
         val resposta = mockMvc.get("/usuarios") {
-            header(FiltroDeCorrelacao.CABECALHO_CORRELACAO, "jornada\n\"; DROP TABLE USUARIOS")
+            header(CorrelacaoFilter.CABECALHO_CORRELACAO, "jornada\n\"; DROP TABLE USUARIOS")
         }.andReturn().response
 
-        val devolvida = resposta.getHeader(FiltroDeCorrelacao.CABECALHO_CORRELACAO)!!
+        val devolvida = resposta.getHeader(CorrelacaoFilter.CABECALHO_CORRELACAO)!!
         assertAll(
             { assertTrue(devolvida.all { it.isLetterOrDigit() || it == '-' || it == '_' }) },
             { assertTrue(devolvida.length <= 64) },
@@ -64,9 +64,9 @@ class FiltroDeCorrelacaoTest {
     @Test
     fun `corta correlacao longa no limite`() {
         val resposta = mockMvc.get("/usuarios") {
-            header(FiltroDeCorrelacao.CABECALHO_CORRELACAO, "a".repeat(200))
+            header(CorrelacaoFilter.CABECALHO_CORRELACAO, "a".repeat(200))
         }.andReturn().response
 
-        assertEquals(64, resposta.getHeader(FiltroDeCorrelacao.CABECALHO_CORRELACAO)!!.length)
+        assertEquals(64, resposta.getHeader(CorrelacaoFilter.CABECALHO_CORRELACAO)!!.length)
     }
 }

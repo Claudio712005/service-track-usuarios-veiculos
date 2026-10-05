@@ -26,7 +26,7 @@ Cumprir as oito obrigações do `GLOBAL-ADR-006`:
 |---|---|
 | rastro distribuído | `spring-boot-starter-opentelemetry` com `management.tracing.sampling.probability: 1.0` |
 | sem ruído de exportador | `management.otlp.tracing.export.enabled: false` e o equivalente para métrica, até existir coletor |
-| filtro por dentro da observação | `@Order(Ordered.HIGHEST_PRECEDENCE + 10)` no `FiltroDeCorrelacao` |
+| filtro por dentro da observação | `@Order(Ordered.HIGHEST_PRECEDENCE + 10)` no `CorrelacaoFilter` |
 | uma linha por requisição | `requisicao concluida metodo= rota= status= duracaoMs=` |
 | rota por template | `HandlerMapping.BEST_MATCHING_PATTERN_ATTRIBUTE`, com o caminho cru só como reserva |
 | cabeçalhos devolvidos | `X-Correlation-Id` e `X-Request-Id` |
