@@ -36,11 +36,11 @@ class UsuarioService(
         exigirDocumentoCompativel(requisicao.tipoDeUsuario, tipoDeDocumento)
 
         if (repositorio.existsByDocumento(documento)) {
-            log.warn("cadastro recusado: documento já existe tipo={}", requisicao.tipoDeUsuario)
+            log.warn("cadastro recusado: documento ja existe tipo={}", requisicao.tipoDeUsuario)
             throw ConflitoException("Já existe usuário com o documento informado")
         }
         if (repositorio.existsByEmailIgnoreCase(requisicao.email.trim())) {
-            log.warn("cadastro recusado: e-mail já existe tipo={}", requisicao.tipoDeUsuario)
+            log.warn("cadastro recusado: e-mail ja existe tipo={}", requisicao.tipoDeUsuario)
             throw ConflitoException("Já existe usuário com o e-mail informado")
         }
 
@@ -58,7 +58,7 @@ class UsuarioService(
 
         val salvo = repositorio.save(usuario)
         log.info(
-            "usuário cadastrado id={} tipo={} tipoDocumento={} roles={}",
+            "usuario cadastrado id={} tipo={} tipoDocumento={} roles={}",
             salvo.id, salvo.tipoDeUsuario, salvo.tipoDeDocumento, salvo.roles.size,
         )
         return salvo
@@ -103,7 +103,7 @@ class UsuarioService(
         requisicao.roles?.takeIf { it.isNotEmpty() }?.let { usuario.roles = resolverRoles(it, usuario.tipoDeUsuario) }
 
         val salvo = repositorio.save(usuario)
-        log.info("usuário atualizado id={} senhaTrocada={}", id, requisicao.senha != null)
+        log.info("usuario atualizado id={} senhaTrocada={}", id, requisicao.senha != null)
         return salvo
     }
 
@@ -116,7 +116,7 @@ class UsuarioService(
         }
         usuario.ativo = false
         repositorio.save(usuario)
-        log.info("usuário desativado id={}", id)
+        log.info("usuario desativado id={}", id)
     }
 
     private fun gerarHashDaSenha(senha: String): String =

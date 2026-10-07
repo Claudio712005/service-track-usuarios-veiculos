@@ -111,7 +111,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(RequestNotPermitted::class)
     fun excessoDeTentativas(e: RequestNotPermitted, requisicao: HttpServletRequest): ResponseEntity<ErroResponse> {
-        log.warn("limite de verificação de credencial atingido rota={}", CorrelacaoFilter.rotaDe(requisicao))
+        log.warn("limite de verificacao de credencial atingido rota={}", CorrelacaoFilter.rotaDe(requisicao))
         return montarResposta(
             HttpStatus.TOO_MANY_REQUESTS,
             "EXCESSO_DE_TENTATIVAS",
@@ -130,7 +130,7 @@ class GlobalExceptionHandler {
 
     @ExceptionHandler(Exception::class)
     fun naoPrevisto(e: Exception, requisicao: HttpServletRequest): ResponseEntity<ErroResponse> {
-        log.error("falha não prevista rota={}", CorrelacaoFilter.rotaDe(requisicao), e)
+        log.error("falha nao prevista rota={}", CorrelacaoFilter.rotaDe(requisicao), e)
         return montarResposta(
             HttpStatus.INTERNAL_SERVER_ERROR,
             "ERRO_INTERNO",

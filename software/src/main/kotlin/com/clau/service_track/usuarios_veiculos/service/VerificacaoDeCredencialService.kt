@@ -27,15 +27,15 @@ class VerificacaoDeCredencialService(
 
         if (usuario == null) {
             codificador.matches(senha, HASH_PARA_TEMPO_CONSTANTE)
-            log.warn("verificação recusada: documento sem cadastro")
+            log.warn("verificacao recusada: documento sem cadastro")
             throw CredencialInvalidaException()
         }
         if (!usuario.ativo) {
-            log.warn("verificação recusada: usuário desativado id={}", usuario.id)
+            log.warn("verificacao recusada: usuario desativado id={}", usuario.id)
             throw CredencialInvalidaException()
         }
         if (!codificador.matches(senha, usuario.senhaHash)) {
-            log.warn("verificação recusada: senha incorreta id={}", usuario.id)
+            log.warn("verificacao recusada: senha incorreta id={}", usuario.id)
             throw CredencialInvalidaException()
         }
 

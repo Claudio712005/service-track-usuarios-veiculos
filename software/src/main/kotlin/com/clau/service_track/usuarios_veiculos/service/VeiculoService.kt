@@ -29,7 +29,7 @@ class VeiculoService(
         exigirClienteAtivo(requisicao.clienteId)
 
         if (repositorio.existsByPlaca(placa)) {
-            log.warn("cadastro de veículo recusado: placa já existe placa={}", placa)
+            log.warn("cadastro de veiculo recusado: placa ja existe clienteId={}", requisicao.clienteId)
             throw ConflitoException("Já existe veículo cadastrado com a placa informada")
         }
 
@@ -46,8 +46,8 @@ class VeiculoService(
 
         val salvo = repositorio.save(veiculo)
         log.info(
-            "veículo cadastrado id={} placa={} clienteId={} marca={} ano={}",
-            salvo.id, salvo.placa, salvo.clienteId, salvo.marca, salvo.anoModelo,
+            "veiculo cadastrado id={} clienteId={} marca={} ano={}",
+            salvo.id, salvo.clienteId, salvo.marca, salvo.anoModelo,
         )
         return salvo
     }
@@ -83,7 +83,7 @@ class VeiculoService(
         veiculo.chassi = Chassi.exigirValidoSeInformado(requisicao.chassi)
 
         val salvo = repositorio.save(veiculo)
-        log.info("veículo atualizado id={} placa={}", id, salvo.placa)
+        log.info("veiculo atualizado id={}", id)
         return salvo
     }
 
@@ -95,7 +95,7 @@ class VeiculoService(
         }
         veiculo.ativo = false
         repositorio.save(veiculo)
-        log.info("veículo desativado id={} placa={}", id, veiculo.placa)
+        log.info("veiculo desativado id={}", id)
     }
 
     private fun exigirClienteAtivo(clienteId: UUID) {
