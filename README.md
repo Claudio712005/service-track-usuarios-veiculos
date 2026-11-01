@@ -118,6 +118,28 @@ O serviço usa o schema `usuarios` e **não gerencia migrations**: o schema é o
 `db/postgres/`, e o Hibernate apenas valida contra ele. Restrições de formato de documento,
 placa e chassi existem também no banco, não só na aplicação.
 
+### Usuários do seed
+
+`db/postgres/02_seed_usuarios.sql` abre o ambiente com gente dentro, pela mesma razão que o
+catálogo semeia serviço e insumo: **sem usuário não existe login**, e não há rota pública que
+crie o primeiro — este serviço não fica atrás do gateway (`IAC-ADR-035`) e o BFF só lê.
+
+| Documento | Nome | Tipo | Estado |
+|---|---|---|---|
+| `52998224725` | Joana Ferreira Lima | CLIENTE | ativa, com dois veículos |
+| `19028736530` | Marcos Antunes Silva | MECANICO | ativo |
+| `74158290341` | Renata Mendes Costa | CLIENTE | **inativa**, de propósito |
+
+A senha das três é **`servicetrack-demo`**, gravada como hash bcrypt de custo 10. É credencial de
+ambiente efêmero, destruído depois de cada teste — não de produção. Nenhum ambiente de longa
+duração deve usar este seed.
+
+Os três CPFs têm dígito verificador válido, porque a aplicação valida e não só o banco. Renata
+entra inativa para exercitar o filtro de ativos sem desativar quem a demonstração usa.
+
+Os dois veículos pertencem à Joana: abrir ordem de serviço exige cliente, mecânico e veículo, e
+dois veículos permitem demonstrar a escolha sem cadastrar nada à mão.
+
 ---
 
 ## Observabilidade
