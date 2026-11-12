@@ -29,7 +29,7 @@ COPY --from=build /workspace/aplicacao.jar ./aplicacao.jar
 RUN java -Djarmode=tools -jar aplicacao.jar extract --layers --launcher --destination extraido
 
 RUN apk add --no-cache curl && \
-    curl -fsSL --retry 5 --retry-all-errors --retry-delay 3 \
+    curl -fsSL --proto '=https' --tlsv1.2 --retry 5 --retry-all-errors --retry-delay 3 \
       -o /extracao/opentelemetry-javaagent.jar \
       "https://github.com/open-telemetry/opentelemetry-java-instrumentation/releases/download/v${OTEL_AGENT_VERSION}/opentelemetry-javaagent.jar" && \
     test -s /extracao/opentelemetry-javaagent.jar
