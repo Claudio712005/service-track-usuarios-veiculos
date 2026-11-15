@@ -13,7 +13,7 @@ components:
 images:
   - name: servicetrack-usuarios-veiculos
     newName: 211125778702.dkr.ecr.us-east-1.amazonaws.com/servicetrack-hml-usuarios-veiculos
-    newTag: 46267ae890d368c93cde67d4817d8430bfbad076
+    newTag: 4cce3f7e646da660ee94ec7efddb3f8937d27ed5
 
 patches:
   - path: hpa-patch.yaml
